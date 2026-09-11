@@ -256,62 +256,6 @@ class BackendService {
       return false;
     }
   }
-
-  // --- AI Chat Agent (multi-tier fallback) ---
-
-  /**
-   * Gửi câu hỏi tới AI Agent theo thứ tự ưu tiên:
-   * 1. Backend LAN chính thức (this.baseUrl, ví dụ cổng 3000 trên Raspberry Pi)
-   * 2. Relative /api/chat (server dev cục bộ, ví dụ server.ts cổng 5173)
-   * 3. Trả về null -> để component tự dùng Local UI logic (fallback cứng)
-   */
-  public async askAiAgent(
-    message: string,
-    options: {
-      context?: any;
-      conversationHistory?: { role: string; text: string }[];
-      timeoutMs?: number;
-    } = {}
-  ): Promise<{ reply: string; source: 'backend' | 'local-api' } | null> {
-    const { context, conversationHistory, timeoutMs = 6000 } = options;
-    const payload = JSON.stringify({ message, context, conversationHistory });
-
-    const tryFetch = async (url: string): Promise<string | null> => {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
-      try {
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: payload,
-          signal: controller.signal,
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        return typeof data?.reply === 'string' && data.reply.trim() ? data.reply : null;
-      } catch (err: any) {
-        console.warn(`[AI Agent] Gọi thất bại tới ${url}:`, err?.message || err);
-        return null;
-      } finally {
-        clearTimeout(timer);
-      }
-    };
-
-    // Tier 1: Backend LAN chính thức (baseUrl có thể là IP Raspberry Pi:3000)
-    const backendReply = await tryFetch(`${this.baseUrl}/api/chat`);
-    if (backendReply) {
-      return { reply: backendReply, source: 'backend' };
-    }
-
-    // Tier 2: Relative path -> server dev cục bộ (server.ts / vite proxy)
-    const localApiReply = await tryFetch('/api/chat');
-    if (localApiReply) {
-      return { reply: localApiReply, source: 'local-api' };
-    }
-
-    // Tier 3: Không có route nào phản hồi -> để component tự xử lý fallback nội bộ
-    return null;
-  }
 }
 
 // Singleton backend service instance

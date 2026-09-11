@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { backendService } from '../services/backendService';
 import {
   PhoneCall,
   UserCheck,
@@ -207,19 +206,25 @@ export const HelpScreen: React.FC<HelpScreenProps> = ({
       emergencyContacts: contacts.map((c) => ({ name: c.name, relation: c.relation, phone: c.phone })),
     };
 
-        let reply = '';
+    let reply = '';
 
     try {
-      const result = await backendService.askAiAgent(q, {
-        context: contextPayload,
-        conversationHistory: messages.slice(-4),
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: q,
+          context: contextPayload,
+          conversationHistory: messages.slice(-4),
+        }),
       });
-      if (result) {
-        reply = result.reply;
-        console.log(`[AI Agent] Trả lời từ nguồn: ${result.source}`);
+
+      if (res.ok) {
+        const data = await res.json();
+        reply = data.reply || '';
       }
     } catch (err) {
-      console.warn('AI Agent request failed, using local assistant logic:', err);
+      console.warn('Chat request failed, using local assistant logic:', err);
     }
 
     // Local smart fallback if server is unreachable
